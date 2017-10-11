@@ -118,12 +118,7 @@ class GenomeAnnotation(object):
                     else:
                         interval = splits[1]
                         strand = '+'
-                    try:
-                        start, end = map(lambda x: int(x) - 1, interval.split('..'))
-                    except:
-                        print(splits)
-                        print(splits[1], interval)
-                        break
+                    start, end = map(lambda x: int(x) - 1, interval.split('..'))
 
                 # gather annotated elements
                 if gathering:
