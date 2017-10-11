@@ -82,6 +82,6 @@ setup(
 
     # Run-time dependencies. (will be installed by pip when FRED2 is installed)
     install_requires=['setuptools>=18.2', 'pandas', "intervaltree", "scikit-learn",
-                      "statsmodels", "matplotlib", "seaborn"],
+                      "statsmodels", "matplotlib", "seaborn", "plotly", "numpy", "scipy"],
 
 )
