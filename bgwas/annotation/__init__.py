@@ -1,1 +1,1 @@
-from bgwas.annotation.annotateion import *
+from bgwas.annotation.annotation import *

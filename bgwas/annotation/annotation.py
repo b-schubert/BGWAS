@@ -178,11 +178,11 @@ class GenomeAnnotation(object):
             data = self.genome_tree.search(i, strict=True)
             if data:
                 # possible overlap of gene entries?
-                p = data.pop()
-                index.append(i)
-                entries.append(p.data)
-                closest.append(None)
-                distance.append(None)
+                for p in data:
+                    index.append(i)
+                    entries.append(p.data)
+                    closest.append(None)
+                    distance.append(None)
             else:
                 # position is not annotated in GenomeAnnotation
                 # find closest annotated CDS
@@ -191,14 +191,14 @@ class GenomeAnnotation(object):
                 i_clos = self.find_closest_gene(i)
                 closest.append(i_clos.locus)
                 distance.append(min(abs(i - i_clos.start), abs(i - i_clos.end)))
-        print("entry", len(entries), "idx", len(index), "closest", len(closest))
+
         anno_df = pd.DataFrame.from_records(entries, columns=self.COLUMNS)
 
         anno_df["pos"] = index
         anno_df["closest"] = closest
         anno_df["distance"] = distance
 
-        return anno_df[["pos", "type", "locus", "name", "product", "strand", "closest", "distance"]]
+        return anno_df[["pos", "type", "locus", "name", "product", "strand", "closest", "distance", "start", "end"]]
 
     def find_closest_gene(self, pos):
         """
