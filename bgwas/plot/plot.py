@@ -66,7 +66,7 @@ def joint_plot(df, x_name, y_name, color="#86a7c5", x_title="", y_title="", out=
     return g
 
 
-def rank_change_plot(df, label, rank_columns, max_plot=5, rank_names=None, out=None, fontsize=15, cmap=None):
+def rank_change_plot(df, label, rank_columns, max_plot=5, rank_names=None, out=None, title_fontsize=15, label_fontsize=12, cmap=None):
     """
         generates a rank-change plot between specified columns on which ranks are calculated
 
@@ -110,7 +110,7 @@ def rank_change_plot(df, label, rank_columns, max_plot=5, rank_names=None, out=N
     # first plot distribution and name
     ax11 = plt.subplot(gs[0, 0])
     ax11.hist(df[rank_columns[0]].values, 50, normed=1, alpha=0.70, color=cmap[0])
-    ax11.set_title(rank_names[0], fontsize=fontsize)
+    ax11.set_title(rank_names[0], fontsize=title_fontsize)
     ax11.get_yaxis().set_visible(False)
     ax11.tick_params(direction='in')
     ax11.axis('off')
@@ -125,7 +125,7 @@ def rank_change_plot(df, label, rank_columns, max_plot=5, rank_names=None, out=N
     y_pos = [i+0.5 for i in np.arange(len(label_pref))]
     ax12.barh(y_pos, df.head(max_plot)[rank_columns[0]].tolist(), align='center', color=cmap[0])
     ax12.set_yticks(y_pos)
-    ax12.set_yticklabels(label_pref)
+    ax12.set_yticklabels(label_pref, fontsize=label_fontsize)
     ax12.set_ylim(0, max_plot)
     ax12.invert_yaxis()  # labels read top-to-bottom
     ax12.spines['right'].set_visible(False)
@@ -140,7 +140,7 @@ def rank_change_plot(df, label, rank_columns, max_plot=5, rank_names=None, out=N
         # first plot distribution and name
         ax11 = plt.subplot(gs[0, j])
         ax11.hist(df[rank_columns[i]].values, 50, normed=1, alpha=0.70, color=cmap[i])
-        ax11.set_title(rank_names[i], fontsize=fontsize)
+        ax11.set_title(rank_names[i], fontsize=title_fontsize)
         ax11.get_yaxis().set_visible(False)
         ax11.tick_params(direction='in')
         ax11.axis('off')
