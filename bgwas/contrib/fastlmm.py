@@ -342,7 +342,7 @@ class LMM(object):
         min = minimize1D(f=f, nGrid=nGridH2, minval=minH2, maxval=maxH2)
         return resmin[0]
 
-    def find_log_delta(self, sid_count, min_log_delta=-5, max_log_delta=10, nGrid=10, **kwargs):
+    def find_log_delta(self, sid_count, min_log_delta=-5, max_log_delta=10, nGrid=100, **kwargs):
         '''
         #Need comments
         '''

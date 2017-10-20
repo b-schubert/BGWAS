@@ -295,29 +295,24 @@ class LMM:
         We calculate the full rank model y ~ x1+ x2 + x1*x2
         and test with a likelihood ration test for epistatic association
         """
-        #if stack:
-        #    # X = np.hstack([self.X0t,matrixMult(self.Kve.T, X)])
-        #    self.X0t_stack[:, (self.q)] = matrixMult(self.Kve.T, X)[:, 0]
-        #    X = self.X0t_stack
+        if stack:
+            # X = np.hstack([self.X0t,matrixMult(self.Kve.T, X)])
+            self.X0t_stack[:, (self.q)] = matrixMult(self.Kve.T, X)[:, 0]
+            X = self.X0t_stack
 
-        if h == None: h = self.optH
+        if h is None:
+            h = self.optH
 
-        UX_0 = matrixMult(self.Kve.T, X[:, :-1])
-        X_0 = np.hstack((self.X0t, UX_0))
-
+        X_0 = X[:, :-1]
         L_0, beta_0, sigma_0, betaVAR_0 = self.LL(h,
                                                   X_0,
                                                   stack=False,
                                                   REML=False)
 
-        UX = matrixMult(self.Kve.T, X)
-        X = np.hstack((self.X0t, UX))
         L_epi, beta_epi, sigma_epi, betaVAR_epi = self.LL(h,
                                                           X,
                                                           stack=False,
                                                           REML=False)
-
-
 
         # test with a log-likelihood ratio test
         LR = -2. * (L_0 - L_epi)

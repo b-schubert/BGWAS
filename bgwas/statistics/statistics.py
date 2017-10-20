@@ -42,7 +42,7 @@ def apc(df, i="i", j="j", colname="fn", outcol="cn"):
     return df
 
 
-def test_epistasis_fastlmm(pairs, X, y, mapping=None, alpha=0.05, n_grid_h2=10):
+def test_epistasis_fastlmm(pairs, X, y, mapping=None, alpha=0.05, n_grid_h2=100):
     """
     Calculates association statistics for a pair of SNPs encoded in the vector X of size n.
     We calculate the full rank model y ~ x1+ x2 + x1*x2
@@ -60,26 +60,12 @@ def test_epistasis_fastlmm(pairs, X, y, mapping=None, alpha=0.05, n_grid_h2=10):
     :param n_grid_h2: number of grid parameter for heritability estimate
     :return: pandas dataframe with columns i,j,D,p_val,r,q_val
     """
-    def infer(X):
-        UX = lmm.U.T.dot(X)
-        k = lmm.S.shape[0]
-        N = X.shape[0]
-        if (k<N):
-            UUX = X - lmm.U.dot(UX)
-        else:
-            UUX = None
-
-        k = lmm.S.shape[0]
-        N, M = X_null.shape
-
+    def infer(X, UX, UUX):
         lmm.X = X
         lmm.UX = UX
-        if (k < N):
-            lmm.UUX = UUX
-        else:
-            lmm.UUX = None
-        res_null = lmm.nLLeval(delta=internal_delta, REML=False)
-        return -res_null["nLL"]
+        lmm.UUX = UUX
+        res = lmm.nLLeval(delta=internal_delta, REML=False)
+        return -res["nLL"]
 
     res_dic = {"i": [], "j": [], "D": [], "p_val": [], "phi": []}
     if mapping is None:
@@ -120,19 +106,26 @@ def test_epistasis_fastlmm(pairs, X, y, mapping=None, alpha=0.05, n_grid_h2=10):
         # exclude SNPs from the RRM in the likelihood evaluation
         lmm.exclude_idx = [i, j]
 
+        # rotate data
+        X_e = np.column_stack((X0[:, 0], X[:, i], X[:, j], X[:, i] * X[:, j]))
+        UX = lmm.U.T.dot(X_e)
+        k = lmm.S.shape[0]
+        N = X.shape[0]
+        if k < N:
+            UUX = X_e - lmm.U.dot(UX)
+            UUX_null = UUX[:, :-1]
+        else:
+            UUX = None
+            UUX_null = None
+
         # first calculate null model with no interaction term
-        X_null = np.column_stack((X0, X[:, i], X[:, j]))
-        # X_null = np.hstack((X0, X[:, [i, j]]))
-        ll_null = infer(X_null)
+        ll_null = infer(X_e[:, :-1], UX[:, :-1], UUX_null)
 
-        # than calculate the the alternative
-
-        X_alt = np.column_stack((X0, X[:, i], X[:, j], X[:, i] * X[:, j]))
-        # X_alt = np.hstack((X0, X[:, [i, j]], (X[:, i] * X[:, j]).reshape(X0.shape[0], 1)))
-        ll_alt = infer(X_alt)
+        # then calculate the the alternative
+        ll_alt = infer(X_e, UX, UUX)
 
         # calculate chi-sqrt test with df=1
-        D = 2.0*(ll_alt - ll_null)
+        D = -2. * (ll_null - ll_alt)
         ps = stats.chi2.sf(D, df=1)
         r = np.sqrt(D/X.shape[0])
 
@@ -147,7 +140,7 @@ def test_epistasis_fastlmm(pairs, X, y, mapping=None, alpha=0.05, n_grid_h2=10):
     return pd.DataFrame.from_dict(res_dic)[["i", "j", "D", "p_val", "phi", "q_val"]]
 
 
-def test_epistasis_pylmm(pairs, X, y, mapping=None, alpha=0.05, n_grid_h2=10):
+def test_epistasis_pylmm(pairs, X, y, mapping=None, alpha=0.05, n_grid_h2=100):
     """
     Calculates association statistics for a pair of SNPs encoded in the vector X of size n.
     We calculate the full rank model y ~ x1+ x2 + x1*x2
@@ -179,7 +172,7 @@ def test_epistasis_pylmm(pairs, X, y, mapping=None, alpha=0.05, n_grid_h2=10):
     Kva, Kve = linalg.eigh(K)
 
     L = pylmm.LMM(y, K, Kva, Kve, verbose=True)
-    L.fit(ngrids=n_grid_h2)
+    L.fit(ngrids=n_grid_h2, REML=False)
 
     for ii, jj in pairs:
         i = mapping.get(ii, ii)
