@@ -159,7 +159,8 @@ def test_epistasis_pylmm(pairs, X, y, mapping=None, alpha=0.05, n_grid_h2=100):
     :return: pandas dataframe with columns i,j,D,p_val,r,q_val
     """
     # fit the null model
-    res_dic = {"i": [], "j": [], "D": [], "p_val": [], "phi": []}
+    mapping = {} if mapping is None else mapping
+    res_dic = {"i": [], "j": [], "D": [], "p_val": [], "phi": [], "beta":[]}
     K = pylmm.calculateKinship(X)
     v = np.isnan(y)
     keep = True - v
@@ -189,4 +190,54 @@ def test_epistasis_pylmm(pairs, X, y, mapping=None, alpha=0.05, n_grid_h2=100):
 
     rejected, q_val, _, _ = multipletests(res_dic["p_val"], alpha=alpha, method='fdr_bh')
     res_dic["q_val"] = q_val
-    return pd.DataFrame.from_dict(res_dic)[["i", "j", "D", "p_val", "phi", "q_val"]]
+    return pd.DataFrame.from_dict(res_dic)[["i", "j", "D", "beta", "p_val", "phi", "q_val"]]
+
+
+def test_single_pylmm(sites, X, y, mapping=None, alpha=0.05, n_grid_h2=100, reml=True, refit=False):
+    """
+    Calculates association statistics for a single SNP encoded in the vector X of size n using a linear mixed model
+    and calculate a Wald-test on the coefficients.
+
+    :param sites: indices to be tested
+    :param X: Genome matrix n x m
+    :param y: phenotype n x 1
+    :param mapping: dict mapping from external (sites) indices to internal (mattrix index)
+    :param alpha: significant threshold
+    :param n_grid_h2: number of grid parameter for heritability estimate
+    :param reml: Boolean indicating whether the ML or REML should be estimated
+    :param refit: Boolean indicating whether variance terms are refitted for each site
+    :return: pandas dataframe with columns i,D,p_val,r,q_val
+    """
+    # fit the null model
+    mapping = {} if mapping is None else mapping
+    res_dic = {"i": [],  "T": [], "p_val": [], "beta": []}
+    K = pylmm.calculateKinship(X)
+    v = np.isnan(y)
+    keep = True - v
+    if v.sum():
+        print("Cleaning the phenotype vector by removing %d individuals...\n" % (v.sum()))
+        y = y[keep]
+        K = K[keep, :][:, keep]
+        X = X[keep, :]
+
+    Kva, Kve = linalg.eigh(K)
+
+    L = pylmm.LMM(y, K, Kva, Kve, verbose=True)
+    L.fit(ngrids=n_grid_h2, REML=reml)
+    n = X.shape[0]
+
+    for ii in sites:
+        i = mapping.get(ii, ii)
+        xs = X[:, i].reshape((n, 1))
+        if refit:
+            L.fit(X=xs, REML=reml)
+
+        ts, ps, ds, beta, beta_var = L.association(xs, REML=reml, returnBeta=True)
+        res_dic["i"].append(ii)
+        res_dic["T"].append(ts)
+        res_dic["p_val"].append(ps)
+        res_dic["beta"].append(beta)
+
+    rejected, q_val, _, _ = multipletests(res_dic["p_val"], alpha=alpha, method='fdr_bh')
+    res_dic["q_val"] = q_val
+    return pd.DataFrame.from_dict(res_dic)[["i", "T", "p_val", "beta", "q_val"]]

@@ -239,7 +239,7 @@ class LMM:
         Given this optimum, the function computes the LL and associated ML solutions.
         """
 
-        if X == None:
+        if X is None:
             X = self.X0t
         else:
             # X = np.hstack([self.X0t,matrixMult(self.Kve.T, X)])
@@ -274,14 +274,18 @@ class LMM:
 
         if h == None: h = self.optH
 
+        if L0 is not None:
+            # likelihood ratio test is only valid for ML estimate
+            REML = False
+
         L, beta, sigma, betaVAR = self.LL(h, X, stack=False, REML=REML)
         q = len(beta)
 
         if L0 is None:
-            ts, ps = self.tstat(beta[q - 1], betaVAR[q - 1, q - 1], sigma, q)
+            ts, ps, ds = self.tstat(beta[q - 1], betaVAR[q - 1, q - 1], sigma, q)
 
-            if returnBeta: return ts, ps, beta[q - 1].sum(), betaVAR[q - 1, q - 1].sum() * sigma
-            return ts, ps
+            if returnBeta: return ts, ps, ds, beta[q - 1].sum(), betaVAR[q - 1, q - 1].sum() * sigma
+            return ts, ps, ds
 
         else:
             # perfome log-likelihood ratio test
@@ -317,7 +321,7 @@ class LMM:
         # test with a log-likelihood ratio test
         LR = -2. * (L_0 - L_epi)
         ps = stats.chi2.sf(LR, df=1)
-        return LR, ps, np.sqrt(LR / self.N)
+        return LR, ps, np.sqrt(LR / self.N), beta_epi[-1]
 
     def tstat(self, beta, var, sigma, q, log=False):
 
@@ -327,6 +331,7 @@ class LMM:
         """
 
         ts = beta / np.sqrt(var * sigma)
+        cohens_d = beta * sigma
         # ps = 2.0*(1.0 - stats.t.cdf(np.abs(ts), self.N-q))
         # sf == survival function - this is more accurate -- could also use logsf if the precision is not good enough
         if log:
@@ -335,7 +340,7 @@ class LMM:
             ps = 2.0 * (stats.t.sf(np.abs(ts), self.N - q))
         if not len(ts) == 1 or not len(ps) == 1:
             raise Exception("Something bad happened :(")
-        return ts.sum(), ps.sum()
+        return ts.sum(), ps.sum(), cohens_d.sum()
 
     def plotFit(self, color='b-', title=''):
 
