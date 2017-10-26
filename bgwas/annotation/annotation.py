@@ -39,7 +39,6 @@ class GenomeAnnotation(object):
 
         # internal data structure for quick internal nearest gene search if position is not annotated
         tmp = []
-
         for v in (self.type_dic["CDS"] + self.type_dic["gene"]):
             tmp.extend([(v.start, v), (v.end, v)])
 
@@ -57,10 +56,10 @@ class GenomeAnnotation(object):
 
         :param genbank_file: a path to a genbank file
         """
-        print("old implementation")
+        ##print("old implementation")
         pseudogenes = []
         with open(genbank_file, "r") as f:
-            type, name, locus, product, product_id, strand, start, end = None, None, None, None, None, None, None, None
+            my_type, name, locus, product, product_id, strand, start, end = None, None, None, None, None, None, None, None
 
             annotated_features = set()
 
@@ -77,7 +76,7 @@ class GenomeAnnotation(object):
                 splits = l.split()
 
                 if splits[0].startswith("LOCUS"):
-                    print(splits)
+                    ##print(splits)
                     self.genome_id = splits[1].strip()
                     self.length = int(splits[2].strip())
 
@@ -88,10 +87,10 @@ class GenomeAnnotation(object):
 
                 # check for parsing stage
                 if splits[0].startswith("COMMENT"):
-                    comment_block = True
+                     comment_block = True
 
                 if splits[0].startswith("FEATURES"):
-                    print(annotated_features)
+                    ##print(annotated_features)
                     annotation_block = True
                     comment_block = False
 
@@ -110,16 +109,16 @@ class GenomeAnnotation(object):
 
                     # first add already gathered entry into data structures
                     if locus is not None:
-                        entry = GenomeEntry(type, name, locus, product, product_id, strand, start, end)
+                        entry = GenomeEntry(my_type, name, locus, product, product_id, strand, start, end)
 
-                        #if type == "PROMOTER":
+                        #if my_type == "PROMOTER":
                         #    print(entry)
                         # if its a gene annotation than first store it in temp for alter processing
-                        if type == "gene":
+                        if my_type == "gene":
                             pseudogenes.append(entry)
                         else:
                             if start > end:
-                                print(entry)
+                                ##print(entry)
                                 c += 1
                                 self.genome_tree.addi(start, self.length, entry)
                                 self.genome_tree.addi(0, end, entry)
@@ -127,15 +126,15 @@ class GenomeAnnotation(object):
                                 self.genome_tree.addi(start, end, entry)
 
                             self.locus_dic[locus] = entry
-                            self.type_dic.setdefault(type, []).append(entry)
+                            self.type_dic.setdefault(my_type, []).append(entry)
 
                             if name is not None:
                                 self.gene_dic[name] = entry
 
-                        type, name, locus, product, product_id, strand, start, end = None, None, None, None, None, None, None, None
+                        my_type, name, locus, product, product_id, strand, start, end = None, None, None, None, None, None, None, None
 
                     gathering = True
-                    type = splits[0]
+                    my_type = splits[0]
                     # determine strand, start and end
 
                     if splits[1].startswith('comp'):
@@ -175,17 +174,17 @@ class GenomeAnnotation(object):
 
             # end of file
             if locus is not None:
-                entry = GenomeEntry(type, name, locus, product, product_id, strand, start, end)
+                entry = GenomeEntry(my_type, name, locus, product, product_id, strand, start, end)
                 # if its a gene annotation than first store it in temp for alter processing
-                #if type == "PROMOTER":
+                #if my_type == "PROMOTER":
                 #    print(entry)
-                if type == "gene":
+                if my_type == "gene":
                     pseudogenes.append(entry)
                 else:
                     start = entry.start
                     end = entry.end
                     if start > end:
-                        print(entry)
+                        ##print(entry)
                         c +=1
                         self.genome_tree.addi(start, self.length, entry)
                         self.genome_tree.addi(0, end, entry)
@@ -197,7 +196,7 @@ class GenomeAnnotation(object):
 
                     if name is not None:
                         self.gene_dic[name] = entry
-            print("Wrongly start end", c)
+            ##print("Wrongly start end", c)
             for p in pseudogenes:
                 # if this is true gene did not have another entry
                 if p.locus not in self.locus_dic:
@@ -255,13 +254,13 @@ class GenomeAnnotation(object):
 
     def __str__(self):
         return pd.DataFrame.from_records(list(self.locus_dic.values()), columns=self.COLUMNS).to_string()
-
+    
     def annotate_positions(self, idx, aggregate=False):
         """
         annotates a list of positions with their associated genomic entries
         and returns a pandas dataframe with rows:
 
-        pos, type, locus, name, product, strand, closest, distance
+        pos, type, locus, name, product, strand, closest, distance, protein_pos, codon_pos
 
         :param idx: list of indices
         :return: pandas dataframe
@@ -278,6 +277,10 @@ class GenomeAnnotation(object):
         closest = []
         distance = []
         index = []
+        
+        protein_position = []
+        codon_position = []
+        
         for i in idx:
             data = self.genome_tree.search(i, strict=True)
             if data:
@@ -288,6 +291,19 @@ class GenomeAnnotation(object):
                     entries.append(p.data)
                     closest.append(None)
                     distance.append(None)
+                    # calculate position within protein and codon position (zero-indexed).
+                    if p.data.strand == '+':
+                        my_prot_pos = int((i - p.data.start) / 3) # int() rounds down.
+                        my_codon_pos = (i - p.data.start) % 3
+                        ##print(my_prot_pos)
+                    elif p.data.strand == '-':
+                        my_prot_pos = int((p.data.end - i) / 3) # int() rounds down.
+                        ##print(my_prot_pos)
+                        my_codon_pos = (p.data.end - i) % 3
+                    else:
+                        raise ValueError("strand annotation is invalid for gene, {}".format(p.data.locus))
+                    protein_position.append(my_prot_pos)
+                    codon_position.append(my_codon_pos)
             else:
                 # position is not annotated in GenomeAnnotation
                 # find closest annotated CDS
@@ -296,6 +312,8 @@ class GenomeAnnotation(object):
                 i_clos = self.find_closest_gene(i)
                 closest.append(i_clos.locus)
                 distance.append(min(abs(i - i_clos.start), abs(i - i_clos.end)))
+                protein_position.append(None)
+                codon_position.append(None)
 
         anno_df = pd.DataFrame.from_records(entries, columns=self.COLUMNS)
 
@@ -303,12 +321,15 @@ class GenomeAnnotation(object):
         anno_df["closest"] = closest
         anno_df["distance"] = distance
 
+        anno_df["protein_pos"] = protein_position
+        anno_df["codon_pos"] = codon_position
+        
         if aggregate:
             anno_df = anno_df.groupby("pos").agg(lambda col: ';'.join(map(str, col)))
             anno_df.reset_index(inplace=True)
             print(anno_df.head())
         return anno_df[["pos", "type", "locus", "name", "product",  "protein_id",
-                        "strand", "closest", "distance", "start", "end"]]
+                        "strand", "closest", "distance", "start", "end", "protein_pos", "codon_pos"]]
 
     def find_closest_gene(self, pos):
         """
@@ -400,11 +421,12 @@ class GenomeAnnotation(object):
 
         return df
 
-
-
 if __name__ == "__main__":
-    g = GenomeAnnotation("../../test_data.gbk")
-    r = g.annotate_positions(160)
+    ## NOTE: I think Benni forgot to git add ../../test_data.gbk (or perhaps not).
+    #g = GenomeAnnotation("../../test_data.gbk")
+    g = GenomeAnnotation("/Users/Rohandinho/Dropbox (HMS)/Antibiotic Resistance/Analysis/N.G._full_b100k_k500/data/ng_FA1090_2016_with_promoters.gbk")
+    #r = g.annotate_positions(160)
+    r = g.annotate_positions(1668203)
     r.groupby("pos")
     print(r.groupby("pos").agg(lambda col: ';'.join(map(str, col))))
 
