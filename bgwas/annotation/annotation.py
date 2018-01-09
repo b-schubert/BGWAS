@@ -294,12 +294,12 @@ class GenomeAnnotation(object):
                     # calculate position within protein and codon position (zero-indexed).
                     if p.data.strand == '+':
                         my_prot_pos = int((i - p.data.start) / 3) # int() rounds down.
-                        my_codon_pos = (i - p.data.start) % 3
+                        my_codon_pos = ((i - p.data.start) % 3) + 1
                         ##print(my_prot_pos)
                     elif p.data.strand == '-':
                         my_prot_pos = int((p.data.end - i) / 3) # int() rounds down.
                         ##print(my_prot_pos)
-                        my_codon_pos = (p.data.end - i) % 3
+                        my_codon_pos = ((p.data.end - i) % 3) + 1
                     else:
                         raise ValueError("strand annotation is invalid for gene, {}".format(p.data.locus))
                     protein_position.append(my_prot_pos)
