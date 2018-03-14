@@ -291,13 +291,13 @@ class GenomeAnnotation(object):
                     entries.append(p.data)
                     closest.append(None)
                     distance.append(None)
-                    # calculate position within protein and codon position (zero-indexed).
+                    # calculate position within protein and codon position (1-indexed).
                     if p.data.strand == '+':
-                        my_prot_pos = int((i - p.data.start) / 3) # int() rounds down.
+                        my_prot_pos = int((i - p.data.start) / 3) + 1 # int() rounds down.
                         my_codon_pos = ((i - p.data.start) % 3) + 1
                         ##print(my_prot_pos)
                     elif p.data.strand == '-':
-                        my_prot_pos = int((p.data.end - i) / 3) # int() rounds down.
+                        my_prot_pos = int((p.data.end - i) / 3) + 1 # int() rounds down.
                         ##print(my_prot_pos)
                         my_codon_pos = ((p.data.end - i) % 3) + 1
                     else:
