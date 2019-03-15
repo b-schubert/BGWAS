@@ -102,7 +102,7 @@ class LMM:
             X0 = np.ones(len(Y)).reshape(len(Y), 1)
         self.verbose = verbose
 
-        x = True - np.isnan(Y)
+        x = True ^ np.isnan(Y)
         x = x.reshape(-1, )
         if not x.sum() == len(Y):
             if self.verbose: print("Removing %d missing values from Y\n" % ((True - x).sum()))
@@ -117,7 +117,7 @@ class LMM:
             if self.verbose: print(
                 "Obtaining eigendecomposition for %dx%d matrix\n" % (K.shape[0], K.shape[1]))
             Kva, Kve = linalg.eigh(K)
-            if self.verbose: print("Total time: %0.3f\n" % (end - begin))
+            #if self.verbose: print("Total time: %0.3f\n" % (end - begin))
 
         self.K = K
         self.Kva = Kva

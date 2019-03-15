@@ -8,11 +8,33 @@ import pandas as pd
 
 from collections import namedtuple
 from bisect import bisect_left
+
+import re
 from intervaltree import IntervalTree
 from Bio import SeqIO
 
 # An element in of the genome annotation
 GenomeEntry = namedtuple('GenomeEntry', ['type', 'name', 'locus', 'product', 'protein_id', 'strand', 'start', 'end'])
+
+
+def _get_interval(interval):
+    """
+    Filters interval out of genbank file
+    :param interval: interval string
+    :return: extracted interval string
+    """
+    if interval.startswith("join"):
+        interval = re.search(r'join\((.+?)\)', interval).group(1).split(",")
+        interval = "..".join([interval[0].split("..")[0], interval[-1].split("..")[-1]])
+    elif interval.startswith("order"):
+        if interval.endswith(","):
+            interval = re.search(r'order\((.+?),', interval).group(1).split(",")
+        else:
+            interval = re.search(r'order\((.+?)\)', interval).group(1).split(",")
+        interval = "..".join([interval[0].split("..")[0], interval[-1].split("..")[-1]])
+    else:
+        interval = interval
+    return interval
 
 
 class GenomeAnnotation(object):
@@ -56,7 +78,7 @@ class GenomeAnnotation(object):
 
         :param genbank_file: a path to a genbank file
         """
-        ##print("old implementation")
+        #print("old implementation")
         pseudogenes = []
         with open(genbank_file, "r") as f:
             my_type, name, locus, product, product_id, strand, start, end = None, None, None, None, None, None, None, None
@@ -125,11 +147,11 @@ class GenomeAnnotation(object):
                             else:
                                 self.genome_tree.addi(start, end, entry)
 
-                            self.locus_dic[locus] = entry
+                            self.locus_dic.setdefault(locus, []).append(entry)
                             self.type_dic.setdefault(my_type, []).append(entry)
 
                             if name is not None:
-                                self.gene_dic[name] = entry
+                                self.gene_dic.setdefault(name, []).append(entry)
 
                         my_type, name, locus, product, product_id, strand, start, end = None, None, None, None, None, None, None, None
 
@@ -138,10 +160,14 @@ class GenomeAnnotation(object):
                     # determine strand, start and end
 
                     if splits[1].startswith('comp'):
-                        interval = splits[1].strip('complement()')
+                        if splits[1].endswith(","):
+                            splits[1] = re.sub(',$', '))', splits[1])
+                        interval = _get_interval(re.search(r'complement\((.+)\)', splits[1]).group(1))
                         strand = '-'
                     else:
-                        interval = splits[1]
+                        if splits[1].endswith(","):
+                            splits[1] = re.sub(',$', ')', splits[1])
+                        interval = _get_interval(splits[1])
                         strand = '+'
                     start, end = map(lambda x: int(x) - 1, interval.split('..'))
                     # TODO: this has to be fixed in the genbank file
@@ -191,20 +217,20 @@ class GenomeAnnotation(object):
                     else:
                         self.genome_tree.addi(entry.start, entry.end, entry)
 
-                    self.locus_dic[locus] = entry
+                    self.locus_dic.setdefault(locus, []).append(entry)
                     self.type_dic.setdefault(type, []).append(entry)
 
                     if name is not None:
-                        self.gene_dic[name] = entry
+                        self.gene_dic.setdefault(name, []).append(entry)
             ##print("Wrongly start end", c)
             for p in pseudogenes:
                 # if this is true gene did not have another entry
                 if p.locus not in self.locus_dic:
-                    self.locus_dic[p.locus] = p
+                    self.locus_dic.setdefault(p.locus, []).append(p)
                     self.type_dic.setdefault(p.type, []).append(p)
                     self.genome_tree.addi(p.start, p.end, p)
                     if p.name is not None:
-                        self.gene_dic[p.name] = p
+                        self.gene_dic.setdefault(p.name, []).append(p)
 
     def _read_genbank2(self, genbank_file):
 
@@ -327,7 +353,6 @@ class GenomeAnnotation(object):
         if aggregate:
             anno_df = anno_df.groupby("pos").agg(lambda col: ';'.join(map(str, col)))
             anno_df.reset_index(inplace=True)
-            print(anno_df.head())
         return anno_df[["pos", "type", "locus", "name", "product",  "protein_id",
                         "strand", "closest", "distance", "start", "end", "protein_pos", "codon_pos"]]
 
@@ -364,7 +389,7 @@ class GenomeAnnotation(object):
         if isinstance(genes, str):
             genes = [genes]
 
-        entries = [self.gene_dic[g] for g in genes if g in self.gene_dic]
+        entries = [e for g in genes for e in self.gene_dic[g] if g in self.gene_dic]
         return pd.DataFrame.from_records(entries, columns=self.COLUMNS)
 
     def annotate_loci(self, loci):
@@ -380,7 +405,7 @@ class GenomeAnnotation(object):
         if isinstance(loci, str):
             loci = [loci]
 
-        entries = [self.locus_dic[g] for g in loci if g in self.locus_dic]
+        entries = [e for g in loci for e in self.locus_dic[g] if g in self.locus_dic]
         return pd.DataFrame.from_records(entries, columns=self.COLUMNS)
 
     def annotate_type(self, types):
@@ -420,6 +445,7 @@ class GenomeAnnotation(object):
         df.drop("pos", axis=1, inplace=True)
 
         return df
+
 
 if __name__ == "__main__":
     ## NOTE: I think Benni forgot to git add ../../test_data.gbk (or perhaps not).

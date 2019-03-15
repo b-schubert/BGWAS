@@ -9,6 +9,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.lines as mlines
+import matplotlib.patches as patches
 
 
 def interactive_scatter(df, x_name, y_name, ann_name, color="blue", x_title="", y_title=""):
@@ -66,7 +67,8 @@ def joint_plot(df, x_name, y_name, color="#86a7c5", x_title="", y_title="", out=
     return g
 
 
-def rank_change_plot(df, label, rank_columns, max_plot=5, rank_names=None, out=None, title_fontsize=15, label_fontsize=12, cmap=None):
+def rank_change_plot(df, label, rank_columns, max_plot=5, rank_names=None, out=None,
+                     title_fontsize=15, label_fontsize=12, cmap=None):
     """
         generates a rank-change plot between specified columns on which ranks are calculated
 
@@ -181,5 +183,60 @@ def rank_change_plot(df, label, rank_columns, max_plot=5, rank_names=None, out=N
 
     if out is not None:
         g.savefig(out)
+
+    return fig
+
+
+def manhatten_plot(test_df, pos, p_val, threshold, y_label=None, genome_annotation=None, out=None):
+    """
+    generates an mahatten plot and optionally draws gene annotations
+
+
+    :param test_df: a dataframe containing test statistic results
+    :param pos: the column name that contains the genome position
+    :param p_val: the column name that contains a p- or q-value (will be -log10 transformed)
+    :param y_label: The label for the y-axis (default column-pos)
+    :param threshold: the significant threshold (untransformed)
+    :param genome_annotation: A GenomeAnnotation object
+    :return: matplotlib figure
+    """
+    if y_label is None:
+        y_label = pos
+    x = test_df[pos].values
+    x_min = np.min(x)
+    x_max = np.max(x)
+    y = -np.log10(test_df[p_val])
+
+    above_thresh = y >= -np.log10(threshold)
+    below_thresh = y < -np.log10(threshold)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    ax.axhline(y=-np.log10(threshold), linestyle="--", color="black", lw=0.5)
+    ax.scatter(x[below_thresh], y[below_thresh], marker=".", color="lightgrey", s=3)
+    ax.scatter(x[above_thresh], y[above_thresh], marker=".", color="#dd627f", s=3)
+    ax.set_xlim((x_min, x_max))
+    ax.set_ylim((min(-0.3, min(y)), max(y)))
+    ax.set_ylabel("$-\log_{10}$("+y_label+")")
+    ax.set_xlabel("Genome Position")
+    ax.set_aspect('auto')
+
+    # here plot genome entities
+    if genome_annotation is not None:
+        annotated_pos = genome_annotation.annotate_positions(set(test_df[pos].values))
+        loci = annotated_pos[["locus", "type", "strand", "start", "end"]].drop_duplicates().dropna()
+
+        for i, row in loci.iterrows():
+            if row.type in ["CDS", "gene", "Gene"]:
+                if row.strand == "+":
+                    a = patches.Rectangle(xy=(row.start, -0.15), width=(row.end - row.start), height=0.1, linewidth=0)
+                else:
+                    a = patches.Rectangle(xy=(row.end, -0.25), width=(row.start - row.end), height=0.1, linewidth=0,
+                                          facecolor="#dd627f")
+                ax.add_patch(a)
+
+    if out is not None:
+        fig.savefig(out)
 
     return fig
