@@ -161,9 +161,9 @@ def test_epistasis_pylmm(pairs, X, y, mapping=None, alpha=0.05, n_grid_h2=100):
     # fit the null model
     mapping = {} if mapping is None else mapping
     res_dic = {"i": [], "j": [], "D": [], "p_val": [], "phi": [], "beta":[]}
-    K = pylmm.calculateKinship(X)
+    K = pylmm.calculateKinship(X, center=True)
     v = np.isnan(y)
-    keep = True - v
+    keep = True ^ v
     if v.sum():
         print("Cleaning the phenotype vector by removing %d individuals...\n" % (v.sum()))
         y = y[keep]
@@ -181,19 +181,20 @@ def test_epistasis_pylmm(pairs, X, y, mapping=None, alpha=0.05, n_grid_h2=100):
         x1 = X[:, i]
         x2 = X[:, j]
         xs = np.column_stack((x1, x2, x1 * x2))
-        D, ps, r = L.epistasis(xs)
+        D, ps, r, beta = L.epistasis(xs)
         res_dic["i"].append(ii)
         res_dic["j"].append(jj)
         res_dic["D"].append(D)
         res_dic["p_val"].append(ps)
         res_dic["phi"].append(r)
+        res_dic["beta"].append(beta)
 
     rejected, q_val, _, _ = multipletests(res_dic["p_val"], alpha=alpha, method='fdr_bh')
     res_dic["q_val"] = q_val
     return pd.DataFrame.from_dict(res_dic)[["i", "j", "D", "beta", "p_val", "phi", "q_val"]]
 
 
-def test_single_pylmm(sites, X, y, mapping=None, alpha=0.05, n_grid_h2=100, reml=True, refit=False):
+def test_single_pylmm(sites, X, y, K=None, mapping=None, alpha=0.05, n_grid_h2=100, reml=True, refit=False):
     """
     Calculates association statistics for a single SNP encoded in the vector X of size n using a linear mixed model
     and calculate a Wald-test on the coefficients.
@@ -211,9 +212,10 @@ def test_single_pylmm(sites, X, y, mapping=None, alpha=0.05, n_grid_h2=100, reml
     # fit the null model
     mapping = {} if mapping is None else mapping
     res_dic = {"i": [],  "T": [], "p_val": [], "beta": []}
-    K = pylmm.calculateKinship(X)
+    if K is None:
+        K = pylmm.calculateKinship(X)
     v = np.isnan(y)
-    keep = True - v
+    keep = True^v
     if v.sum():
         print("Cleaning the phenotype vector by removing %d individuals...\n" % (v.sum()))
         y = y[keep]
